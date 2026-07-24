@@ -39,7 +39,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
   const quizQuestions = [
     {
       question: "Which date in July is officially declared the Cutest Day Ever?",
-      options: ["July 1st", "July 27th (Her Birthday! 🎂)", "July 14th", "July 30th"],
+      options: ["July 1st", "July 27th (Your BirthDay! 😉)", "July 14th", "July 30th"],
       correct: 1,
       explanation: "Correct! July 27th is 100% legendary!",
     },
@@ -227,9 +227,8 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
                 sounds.playClick();
                 setActiveGameTab('catch');
               }}
-              className={`px-4 py-1.5 rounded-full font-medium text-xs transition-colors ${
-                activeGameTab === 'catch' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
-              }`}
+              className={`px-4 py-1.5 rounded-full font-medium text-xs transition-colors ${activeGameTab === 'catch' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
+                }`}
             >
               Catch Treats
             </button>
@@ -238,9 +237,8 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
                 sounds.playClick();
                 setActiveGameTab('quiz');
               }}
-              className={`px-4 py-1.5 rounded-full font-medium text-xs transition-colors ${
-                activeGameTab === 'quiz' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
-              }`}
+              className={`px-4 py-1.5 rounded-full font-medium text-xs transition-colors ${activeGameTab === 'quiz' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
+                }`}
             >
               Birthday Quiz
             </button>
@@ -369,15 +367,14 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
                         key={idx}
                         onClick={() => handleAnswerQuiz(idx)}
                         disabled={selectedOption !== null}
-                        className={`p-3.5 rounded-xl border text-xs font-medium text-left transition-all flex items-center justify-between ${
-                          selectedOption !== null
+                        className={`p-3.5 rounded-xl border text-xs font-medium text-left transition-all flex items-center justify-between ${selectedOption !== null
                             ? isCorrect
                               ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                               : isSelected
-                              ? 'bg-rose-50 border-rose-300 text-rose-900'
-                              : 'bg-white border-stone-200 opacity-50'
+                                ? 'bg-rose-50 border-rose-300 text-rose-900'
+                                : 'bg-white border-stone-200 opacity-50'
                             : 'bg-white hover:bg-stone-50 border-stone-200 text-stone-800'
-                        }`}
+                          }`}
                       >
                         <span>{opt}</span>
                         {selectedOption !== null && isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}

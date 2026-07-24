@@ -5,6 +5,7 @@ class SoundManager {
   private isMuted: boolean = false;
   private bgmInterval: any = null;
   private isPlayingBgm: boolean = false;
+  private bgmAudio: HTMLAudioElement | null = null;
 
   private initCtx() {
     if (!this.ctx) {
@@ -195,36 +196,24 @@ class SoundManager {
   private startBgm() {
     if (this.isPlayingBgm) return;
     this.isPlayingBgm = true;
+
+    // Put your MP3 file in the public folder, for example:
+    // public/music.mp3
+    // Then uncomment the block below and update the path if needed.
     
-    // C Major 7th arpeggios: C4, E4, G4, B4, C5, E5
-    const scale = [261.63, 329.63, 392.00, 493.88, 523.25, 659.25, 523.25, 493.88];
-    let noteIdx = 0;
-
-    this.bgmInterval = setInterval(() => {
-      if (this.isMuted || !this.isPlayingBgm || !this.ctx) return;
-
-      const freq = scale[noteIdx % scale.length];
-      noteIdx++;
-
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-
-      gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
-
-      osc.connect(gain);
-      gain.connect(this.ctx.destination);
-
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.4);
-    }, 380);
+    this.bgmAudio = new Audio('/music.mp3');
+    this.bgmAudio.loop = true;
+    this.bgmAudio.volume = 0.45;
+    this.bgmAudio.play().catch(() => {});
   }
 
   private stopBgm() {
     this.isPlayingBgm = false;
+    if (this.bgmAudio) {
+      this.bgmAudio.pause();
+      this.bgmAudio.currentTime = 0;
+      this.bgmAudio = null;
+    }
     if (this.bgmInterval) {
       clearInterval(this.bgmInterval);
       this.bgmInterval = null;
