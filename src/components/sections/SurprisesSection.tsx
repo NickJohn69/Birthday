@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Gift, Star } from 'lucide-react';
+import { Gift, Heart } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sounds } from '../../utils/audio';
 
@@ -49,13 +49,18 @@ export const SurprisesSection: React.FC<SurprisesSectionProps> = ({ onAddHearts 
   const [constellationDone, setConstellationDone] = useState<boolean>(false);
   const [connectedCount, setConnectedCount] = useState<number>(0);
 
+  // 10 Star Points explicitly arranged in a perfect Heart Shape
   const starPoints = [
-    { x: 140, y: 70 },
-    { x: 210, y: 45 },
-    { x: 280, y: 70 },
-    { x: 320, y: 130 },
-    { x: 210, y: 240 },
-    { x: 100, y: 130 },
+    { x: 210, y: 90 },  // Top center dip
+    { x: 165, y: 65 },  // Left top arch
+    { x: 120, y: 88 },  // Left lobe peak
+    { x: 105, y: 132 }, // Left side waist
+    { x: 145, y: 185 }, // Left lower slope
+    { x: 210, y: 235 }, // Bottom heart tip
+    { x: 275, y: 185 }, // Right lower slope
+    { x: 315, y: 132 }, // Right side waist
+    { x: 300, y: 88 },  // Right lobe peak
+    { x: 255, y: 65 },  // Right top arch
   ];
 
   useEffect(() => {
@@ -66,25 +71,60 @@ export const SurprisesSection: React.FC<SurprisesSectionProps> = ({ onAddHearts 
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Draw background ambient stars
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    const bgStars = [
+      { x: 40, y: 40 }, { x: 380, y: 50 }, { x: 50, y: 220 }, { x: 370, y: 230 },
+      { x: 80, y: 120 }, { x: 340, y: 150 }, { x: 190, y: 30 }, { x: 230, y: 260 }
+    ];
+    bgStars.forEach(s => {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const isComplete = connectedCount === starPoints.length;
+
+    // Draw connected path
     if (connectedCount > 1) {
       ctx.beginPath();
       ctx.moveTo(starPoints[0].x, starPoints[0].y);
       for (let i = 1; i < connectedCount; i++) {
         ctx.lineTo(starPoints[i].x, starPoints[i].y);
       }
-      if (connectedCount === starPoints.length) {
-        ctx.lineTo(starPoints[0].x, starPoints[0].y);
+      if (isComplete) {
+        ctx.closePath();
       }
-      ctx.strokeStyle = '#f43f5e';
-      ctx.lineWidth = 2.5;
+
+      // If fully connected: Fill heart with glowing vibrant red color!
+      if (isComplete) {
+        ctx.fillStyle = 'rgba(225, 29, 72, 0.85)'; // Vibrant Crimson Red
+        ctx.shadowColor = '#e11d48';
+        ctx.shadowBlur = 20;
+        ctx.fill();
+      }
+
+      // Stroke border line
+      ctx.strokeStyle = isComplete ? '#ffffff' : '#fb7185';
+      ctx.lineWidth = isComplete ? 3.5 : 2.5;
+      ctx.shadowColor = isComplete ? '#ffffff' : '#fb7185';
+      ctx.shadowBlur = isComplete ? 15 : 8;
       ctx.stroke();
+      ctx.shadowBlur = 0; // reset shadow
     }
 
+    // Draw Heart-shaped nodes at each point
+    ctx.font = '14px serif';
     starPoints.forEach((pt, idx) => {
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, idx < connectedCount ? 7 : 4, 0, Math.PI * 2);
-      ctx.fillStyle = idx < connectedCount ? '#f43f5e' : '#a8a29e';
-      ctx.fill();
+      const isActivated = idx < connectedCount;
+      // Draw heart character
+      ctx.fillStyle = isActivated ? '#ff4d4f' : 'rgba(255,255,255,0.4)';
+      if (isActivated) {
+        ctx.shadowColor = '#ff4d4f';
+        ctx.shadowBlur = 8;
+      }
+      ctx.fillText('❤️', pt.x - 7, pt.y + 5);
+      ctx.shadowBlur = 0;
     });
   }, [connectedCount]);
 
@@ -97,14 +137,20 @@ export const SurprisesSection: React.FC<SurprisesSectionProps> = ({ onAddHearts 
         setConstellationDone(true);
         sounds.playUnlockSuccess();
         confetti({
-          particleCount: 80,
-          spread: 70,
+          particleCount: 100,
+          spread: 80,
           origin: { y: 0.6 },
           colors: ['#e11d48', '#d4af37', '#ffffff'],
         });
         onAddHearts(10);
       }
     }
+  };
+
+  const handleResetConstellation = () => {
+    sounds.playClick();
+    setConnectedCount(0);
+    setConstellationDone(false);
   };
 
   const handleUnwrapGift = (id: number) => {
@@ -169,20 +215,20 @@ export const SurprisesSection: React.FC<SurprisesSectionProps> = ({ onAddHearts 
         ))}
       </div>
 
-      {/* Night Sky Constellation */}
+      {/* Interactive Sky Heart Constellation */}
       <div className="apple-card p-6 text-center">
         <span className="text-xs font-medium text-stone-400 uppercase tracking-wider block mb-1">
           Interactive Sky
         </span>
         <h3 className="font-serif text-xl font-semibold text-stone-900">
-          Connect the July 27th Constellation ✨
+          Connect the July 27th Star Heart ✨
         </h3>
         <p className="text-xs text-stone-500 mt-0.5 max-w-xs mx-auto">
-          Tap on stars to connect the constellation lines and form a star heart.
+          Tap on the stars to connect the constellation lines and fill the heart with crimson red!
         </p>
 
         <div className="my-4 flex justify-center">
-          <div className="border border-stone-200 rounded-2xl bg-stone-50 p-2">
+          <div className="border border-stone-800 rounded-2xl bg-stone-950 p-2 shadow-inner">
             <canvas
               ref={canvasRef}
               width={420}
@@ -202,8 +248,17 @@ export const SurprisesSection: React.FC<SurprisesSectionProps> = ({ onAddHearts 
               Connect Star #{connectedCount + 1} ⭐
             </button>
           ) : (
-            <div className="text-emerald-700 font-semibold text-xs bg-emerald-50 border border-emerald-200 p-2.5 rounded-full max-w-xs mx-auto">
-              🎉 Star Constellation Completed! (+10 Hearts)
+            <div className="space-y-2">
+              <div className="text-rose-700 font-semibold text-xs bg-rose-50 border border-rose-200 p-2.5 rounded-full max-w-xs mx-auto flex items-center justify-center space-x-1.5">
+                <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
+                <span>Star Heart Completed! (+10 Hearts)</span>
+              </div>
+              <button
+                onClick={handleResetConstellation}
+                className="text-[11px] text-stone-400 hover:text-stone-600 underline font-medium"
+              >
+                Reset Constellation
+              </button>
             </div>
           )}
         </div>

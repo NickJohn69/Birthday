@@ -5,11 +5,10 @@ import { sounds } from '../../utils/audio';
 
 interface FallingItem {
   id: number;
-  x: number;
-  y: number;
+  x: number; // percentage 5-95
+  y: number; // percentage 0-100
   speed: number;
   icon: string;
-  points: number;
 }
 
 interface GamesSectionProps {
@@ -19,16 +18,19 @@ interface GamesSectionProps {
 export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
   const [activeGameTab, setActiveGameTab] = useState<'catch' | 'quiz'>('catch');
 
-  // CATCH GAME
+  // CATCH GAME STATE
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'ended'>('idle');
   const [score, setScore] = useState<number>(0);
   const [highScore, setHighScore] = useState<number>(0);
-  const [timeLeft, setTimeLeft] = useState<number>(20);
-  const [basketX, setBasketX] = useState<number>(50);
-  const [fallingItems, setFallingItems] = useState<FallingItem[]>([]);
-  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(25);
+  const [basketX, setBasketX] = useState<number>(50); // 0 - 100 percentage
+  const [items, setItems] = useState<FallingItem[]>([]);
 
-  // QUIZ
+  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const basketXRef = useRef<number>(50);
+  basketXRef.current = basketX;
+
+  // QUIZ STATE
   const [currentQuizIdx, setCurrentQuizIdx] = useState<number>(0);
   const [quizScore, setQuizScore] = useState<number>(0);
   const [quizFinished, setQuizFinished] = useState<boolean>(false);
@@ -71,7 +73,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
     },
   ];
 
-  // GAME LOOP
+  // GAME TIMER (25 Seconds Countdown)
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -81,8 +83,6 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
           clearInterval(timer);
           setGameState('ended');
           sounds.playUnlockSuccess();
-          if (score > highScore) setHighScore(score);
-          onAddHearts(Math.floor(score / 2));
           return 0;
         }
         return prev - 1;
@@ -90,68 +90,92 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [gameState, score, highScore]);
-
-  // SPAWN FALLING ITEMS
-  useEffect(() => {
-    if (gameState !== 'playing') return;
-
-    const spawnInterval = setInterval(() => {
-      const icons = ['💖', '🎂', '✨', '🌸', '🎁', '⭐'];
-      const newItem: FallingItem = {
-        id: Date.now() + Math.random(),
-        x: Math.random() * 85 + 5,
-        y: -10,
-        speed: Math.random() * 2.2 + 2.2,
-        icon: icons[Math.floor(Math.random() * icons.length)],
-        points: 1,
-      };
-      setFallingItems((prev) => [...prev, newItem]);
-    }, 500);
-
-    return () => clearInterval(spawnInterval);
   }, [gameState]);
 
-  // ANIMATION & COLLISION
+  // Update High score & heart rewards when game ends
+  useEffect(() => {
+    if (gameState === 'ended') {
+      setHighScore((prev) => Math.max(prev, score));
+      onAddHearts(Math.floor(score / 2));
+    }
+  }, [gameState]);
+
+  // MAIN GAME LOOP (Spawning & Moving Items smoothly)
   useEffect(() => {
     if (gameState !== 'playing') return;
 
-    const animFrame = requestAnimationFrame(() => {
-      setFallingItems((prevItems) =>
-        prevItems
-          .map((item) => ({ ...item, y: item.y + item.speed }))
-          .filter((item) => {
-            if (item.y >= 75 && item.y <= 88) {
-              const distance = Math.abs(item.x - basketX);
-              if (distance < 12) {
-                sounds.playCatch();
-                setScore((s) => s + item.points);
-                return false;
-              }
+    let animId: number;
+    let lastSpawnTime = performance.now();
+    const icons = ['🎂', '💖', '✨', '🌸', '🎁', '⭐', '🍓', '🍰', '🧋'];
+
+    const gameLoop = (currentTime: number) => {
+      // 1. Spawn new items every 650ms
+      if (currentTime - lastSpawnTime > 650) {
+        lastSpawnTime = currentTime;
+        const newItem: FallingItem = {
+          id: currentTime + Math.random(),
+          x: Math.random() * 84 + 8, // 8% to 92%
+          y: -5,
+          speed: Math.random() * 0.45 + 0.45, // Smooth percentage drop per frame
+          icon: icons[Math.floor(Math.random() * icons.length)],
+        };
+        setItems((prev) => [...prev, newItem]);
+      }
+
+      // 2. Move items & check collisions
+      setItems((prevItems) => {
+        const nextItems: FallingItem[] = [];
+        const currentBasketX = basketXRef.current;
+
+        for (const item of prevItems) {
+          const nextY = item.y + item.speed;
+
+          // Collision detection near bottom basket (y between 80% and 94%)
+          if (nextY >= 80 && nextY <= 94) {
+            const distance = Math.abs(item.x - currentBasketX);
+            if (distance <= 16) {
+              // Caught!
+              sounds.playCatch();
+              setScore((s) => s + 1);
+              continue; // remove caught item
             }
-            return item.y < 100;
-          })
-      );
-    });
+          }
 
-    return () => cancelAnimationFrame(animFrame);
-  }, [fallingItems, gameState, basketX]);
+          // Keep item if still on screen
+          if (nextY < 100) {
+            nextItems.push({ ...item, y: nextY });
+          }
+        }
+        return nextItems;
+      });
 
-  const handlePointerMove = (clientX: number) => {
+      animId = requestAnimationFrame(gameLoop);
+    };
+
+    animId = requestAnimationFrame(gameLoop);
+
+    return () => cancelAnimationFrame(animId);
+  }, [gameState]);
+
+  // Pointer / Mouse / Touch Movement Handler
+  const updateBasketPosition = (clientX: number) => {
     if (!gameAreaRef.current) return;
     const rect = gameAreaRef.current.getBoundingClientRect();
     const relativeX = ((clientX - rect.left) / rect.width) * 100;
-    setBasketX(Math.max(8, Math.min(92, relativeX)));
+    const clampedX = Math.max(8, Math.min(92, relativeX));
+    setBasketX(clampedX);
   };
 
   const startCatchGame = () => {
     sounds.playClick();
     setScore(0);
-    setTimeLeft(20);
-    setFallingItems([]);
+    setTimeLeft(25);
+    setItems([]);
+    setBasketX(50);
     setGameState('playing');
   };
 
+  // QUIZ LOGIC
   const handleAnswerQuiz = (optIdx: number) => {
     if (selectedOption !== null) return;
     setSelectedOption(optIdx);
@@ -207,7 +231,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
                 activeGameTab === 'catch' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
               }`}
             >
-              Catch Sprinkles
+              Catch Treats
             </button>
             <button
               onClick={() => {
@@ -223,22 +247,22 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
           </div>
         </div>
 
-        {/* GAME 1 */}
+        {/* CATCH TREATS GAME */}
         {activeGameTab === 'catch' && (
           <div className="text-center">
             {gameState === 'idle' && (
-              <div className="py-8 space-y-4">
-                <div className="w-16 h-16 bg-stone-100 text-rose-500 rounded-full flex items-center justify-center mx-auto text-3xl border border-stone-200 shadow-sm">
-                  💖
+              <div className="py-10 space-y-4">
+                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto text-3xl border border-rose-200/60 shadow-sm">
+                  🎂
                 </div>
                 <h3 className="font-serif text-xl font-semibold text-stone-900">
-                  Catch Falling Birthday Sprinkles
+                  Catch Falling Birthday Treats
                 </h3>
-                <p className="text-xs text-stone-500 max-w-xs mx-auto">
-                  Move your basket across the screen to catch falling items in 20 seconds!
+                <p className="text-xs text-stone-500 max-w-xs mx-auto leading-relaxed">
+                  Move your basket left and right to catch falling treats in 25 seconds!
                 </p>
                 {highScore > 0 && (
-                  <div className="inline-flex items-center space-x-1.5 bg-stone-100 text-stone-800 text-xs px-3 py-1 rounded-full font-medium">
+                  <div className="inline-flex items-center space-x-1.5 bg-stone-100 text-stone-800 text-xs px-3.5 py-1 rounded-full font-medium">
                     <Trophy className="w-3.5 h-3.5 text-stone-600" />
                     <span>High Score: {highScore} Points</span>
                   </div>
@@ -256,23 +280,27 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
 
             {gameState === 'playing' && (
               <div className="space-y-3">
-                <div className="flex justify-between items-center bg-stone-900 text-white px-4 py-2 rounded-2xl text-xs font-medium">
+                {/* Score Header Bar */}
+                <div className="flex justify-between items-center bg-stone-900 text-white px-5 py-2.5 rounded-2xl text-xs font-medium">
                   <span>Score: {score} 💖</span>
+                  <span className="text-stone-400 text-[11px] hidden sm:inline">Move basket to catch</span>
                   <span>Time: {timeLeft}s</span>
                 </div>
 
+                {/* Big Game Playing Area */}
                 <div
                   ref={gameAreaRef}
-                  onMouseMove={(e) => handlePointerMove(e.clientX)}
+                  onPointerMove={(e) => updateBasketPosition(e.clientX)}
                   onTouchMove={(e) => {
-                    if (e.touches.length > 0) handlePointerMove(e.touches[0].clientX);
+                    if (e.touches.length > 0) updateBasketPosition(e.touches[0].clientX);
                   }}
-                  className="relative w-full h-[300px] bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden cursor-crosshair touch-none"
+                  className="relative w-full h-[400px] sm:h-[460px] bg-gradient-to-b from-stone-50 via-rose-50/20 to-white rounded-3xl border border-stone-200 overflow-hidden cursor-crosshair touch-none shadow-inner"
                 >
-                  {fallingItems.map((item) => (
+                  {/* Falling items */}
+                  {items.map((item) => (
                     <div
                       key={item.id}
-                      className="absolute text-xl select-none"
+                      className="absolute text-3xl select-none filter drop-shadow-sm pointer-events-none"
                       style={{
                         left: `${item.x}%`,
                         top: `${item.y}%`,
@@ -283,11 +311,12 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
                     </div>
                   ))}
 
+                  {/* Catch Basket */}
                   <div
-                    className="absolute bottom-3 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-75"
+                    className="absolute bottom-5 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-75"
                     style={{ left: `${basketX}%` }}
                   >
-                    <div className="w-16 h-7 bg-stone-800 rounded-b-xl border border-stone-600 shadow-md flex items-center justify-center text-white font-medium text-[11px]">
+                    <div className="w-20 h-9 bg-stone-900 rounded-b-2xl border-2 border-white shadow-lg flex items-center justify-center text-white font-medium text-xs">
                       🧺 Catch
                     </div>
                   </div>
@@ -296,11 +325,11 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
             )}
 
             {gameState === 'ended' && (
-              <div className="py-8 space-y-4">
+              <div className="py-10 space-y-4">
                 <Trophy className="w-12 h-12 text-rose-500 mx-auto" />
                 <h3 className="font-serif text-2xl font-semibold text-stone-900">Game Over</h3>
                 <p className="text-sm font-medium text-stone-600">
-                  You caught <span className="font-semibold text-stone-900">{score}</span> items!
+                  You caught <span className="font-semibold text-stone-900">{score}</span> treats!
                 </p>
 
                 <button
@@ -315,7 +344,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onAddHearts }) => {
           </div>
         )}
 
-        {/* GAME 2 */}
+        {/* BIRTHDAY QUIZ */}
         {activeGameTab === 'quiz' && (
           <div className="space-y-6">
             {!quizFinished ? (
